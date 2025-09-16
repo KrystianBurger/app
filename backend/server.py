@@ -1,5 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,7 +10,6 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 import base64
-import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -27,16 +25,10 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Security
-security = HTTPBearer()
+# Admin users list
+ADMIN_USERS = ['dawid.boguslaw@emerlog.eu']
 
 # Define Models
-class User(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    username: str
-    role: str  # "user" or "admin"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
 class Problem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
@@ -61,47 +53,58 @@ class ProblemCreate(BaseModel):
     description: str
     category: str
     attachments: List[str] = []
+    created_by: str
 
 class InstructionCreate(BaseModel):
     problem_id: str
     instruction_text: str
     images: List[str] = []
+    created_by: str
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+# Helper function to prepare data for MongoDB
+def prepare_for_mongo(data):
+    if isinstance(data, dict):
+        prepared = {}
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                prepared[key] = value.isoformat()
+            elif isinstance(value, list):
+                prepared[key] = [prepare_for_mongo(item) if isinstance(item, dict) else item for item in value]
+            elif isinstance(value, dict):
+                prepared[key] = prepare_for_mongo(value)
+            else:
+                prepared[key] = value
+        return prepared
+    return data
 
-# Mock users for demo
-MOCK_USERS = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "user": {"password": "user123", "role": "user"}
-}
-
-# Authentication
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
-    # Simple token validation (in real app, use JWT)
-    if token in ["admin_token", "user_token"]:
-        role = "admin" if token == "admin_token" else "user"
-        return {"username": token.replace("_token", ""), "role": role}
-    raise HTTPException(status_code=401, detail="Invalid token")
-
-# Auth endpoints
-@api_router.post("/login")
-async def login(request: LoginRequest):
-    if (request.username in MOCK_USERS and 
-        MOCK_USERS[request.username]["password"] == request.password):
-        token = f"{request.username}_token"
-        role = MOCK_USERS[request.username]["role"]
-        return {"token": token, "role": role, "username": request.username}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+# Helper function to parse data from MongoDB
+def parse_from_mongo(item):
+    if isinstance(item, dict):
+        parsed = {}
+        for key, value in item.items():
+            if key.endswith('_at') and isinstance(value, str):
+                try:
+                    parsed[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                except:
+                    parsed[key] = value
+            elif isinstance(value, list):
+                parsed[key] = [parse_from_mongo(subitem) if isinstance(subitem, dict) else subitem for subitem in value]
+            elif isinstance(value, dict):
+                parsed[key] = parse_from_mongo(value)
+            else:
+                parsed[key] = value
+        return parsed
+    return item
 
 # Problem endpoints
 @api_router.post("/problems", response_model=Problem)
-async def create_problem(problem: ProblemCreate, current_user: dict = Depends(get_current_user)):
+async def create_problem(problem: ProblemCreate):
     problem_dict = problem.dict()
-    problem_obj = Problem(**problem_dict, created_by=current_user["username"], status="Nowy")
-    await db.problems.insert_one(problem_obj.dict())
+    problem_obj = Problem(**problem_dict, status="Nowy")
+    
+    # Prepare for MongoDB storage
+    mongo_data = prepare_for_mongo(problem_obj.dict())
+    await db.problems.insert_one(mongo_data)
     return problem_obj
 
 @api_router.get("/problems", response_model=List[Problem])
@@ -113,23 +116,22 @@ async def get_problems(status: Optional[str] = None, category: Optional[str] = N
         filter_dict["category"] = category
     
     problems = await db.problems.find(filter_dict).to_list(1000)
-    return [Problem(**problem) for problem in problems]
+    parsed_problems = [parse_from_mongo(problem) for problem in problems]
+    return [Problem(**problem) for problem in parsed_problems]
 
 @api_router.get("/problems/{problem_id}", response_model=Problem)
 async def get_problem(problem_id: str):
     problem = await db.problems.find_one({"id": problem_id})
     if not problem:
         raise HTTPException(status_code=404, detail="Problem not found")
-    return Problem(**problem)
+    parsed_problem = parse_from_mongo(problem)
+    return Problem(**parsed_problem)
 
 @api_router.put("/problems/{problem_id}/status")
-async def update_problem_status(problem_id: str, status: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
+async def update_problem_status(problem_id: str, status: str):
     result = await db.problems.update_one(
         {"id": problem_id},
-        {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}}
+        {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Problem not found")
@@ -137,18 +139,18 @@ async def update_problem_status(problem_id: str, status: str, current_user: dict
 
 # Instruction endpoints
 @api_router.post("/instructions", response_model=Instruction)
-async def create_instruction(instruction: InstructionCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
+async def create_instruction(instruction: InstructionCreate):
     instruction_dict = instruction.dict()
-    instruction_obj = Instruction(**instruction_dict, created_by=current_user["username"])
-    await db.instructions.insert_one(instruction_obj.dict())
+    instruction_obj = Instruction(**instruction_dict)
+    
+    # Prepare for MongoDB storage
+    mongo_data = prepare_for_mongo(instruction_obj.dict())
+    await db.instructions.insert_one(mongo_data)
     
     # Update problem status to "Rozwiązany"
     await db.problems.update_one(
         {"id": instruction.problem_id},
-        {"$set": {"status": "Rozwiązany", "updated_at": datetime.now(timezone.utc)}}
+        {"$set": {"status": "Rozwiązany", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
     return instruction_obj
@@ -158,7 +160,8 @@ async def get_instruction_by_problem(problem_id: str):
     instruction = await db.instructions.find_one({"problem_id": problem_id})
     if not instruction:
         return None
-    return Instruction(**instruction)
+    parsed_instruction = parse_from_mongo(instruction)
+    return Instruction(**parsed_instruction)
 
 # File upload endpoint
 @api_router.post("/upload")
@@ -171,10 +174,24 @@ async def upload_file(file: UploadFile = File(...)):
         "base64_data": base64_content
     }
 
-# Health check
+# Health check and stats
 @api_router.get("/")
 async def root():
     return {"message": "IT HelpDesk API is running"}
+
+@api_router.get("/stats")
+async def get_stats():
+    total_problems = await db.problems.count_documents({})
+    new_problems = await db.problems.count_documents({"status": "Nowy"})
+    in_progress_problems = await db.problems.count_documents({"status": "W toku"})
+    resolved_problems = await db.problems.count_documents({"status": "Rozwiązany"})
+    
+    return {
+        "total": total_problems,
+        "new": new_problems,
+        "in_progress": in_progress_problems,
+        "resolved": resolved_problems
+    }
 
 # Include the router in the main app
 app.include_router(api_router)
