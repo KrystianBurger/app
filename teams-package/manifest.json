@@ -1,0 +1,49 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "2c8b2c8b-4c8b-4c8b-8c8b-2c8b2c8b2c8b",
+  "developer": {
+    "name": "Emerlog IT Team",
+    "websiteUrl": "https://emerlog.eu",
+    "privacyUrl": "https://emerlog.eu/privacy",
+    "termsOfUseUrl": "https://emerlog.eu/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "IT HelpDesk",
+    "full": "IT HelpDesk - System zarządzania problemami IT"
+  },
+  "description": {
+    "short": "System do zgłaszania i rozwiązywania problemów IT",
+    "full": "Kompleksowy system HelpDesk do zarządzania problemami IT w organizacji. Umożliwia zgłaszanie problemów, śledzenie statusu oraz dodawanie rozwiązań przez administratorów."
+  },
+  "accentColor": "#2563EB",
+  "bots": [],
+  "composeExtensions": [],
+  "configurationTabs": [],
+  "staticTabs": [
+    {
+      "entityId": "it-helpdesk",
+      "name": "IT HelpDesk",
+      "contentUrl": "https://sp-ticketing.preview.emergentagent.com",
+      "websiteUrl": "https://sp-ticketing.preview.emergentagent.com",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "sp-ticketing.preview.emergentagent.com",
+    "emerlog.eu"
+  ],
+  "webApplicationInfo": {
+    "id": "2c8b2c8b-4c8b-4c8b-8c8b-2c8b2c8b2c8b",
+    "resource": "https://sp-ticketing.preview.emergentagent.com"
+  }
+}
