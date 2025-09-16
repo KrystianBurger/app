@@ -34,7 +34,7 @@ class Problem(BaseModel):
     title: str
     description: str
     status: str  # "Nowy", "W toku", "Rozwiązany"
-    category: str  # "Sprzęt", "Oprogramowanie", "Sieć", "Inne"
+    category: str  # "Windows", "Drukarki", "Poczta", "OneDrive", "Inne"
     attachments: List[str] = []  # Base64 encoded files
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -186,11 +186,25 @@ async def get_stats():
     in_progress_problems = await db.problems.count_documents({"status": "W toku"})
     resolved_problems = await db.problems.count_documents({"status": "Rozwiązany"})
     
+    # Stats by category
+    windows_problems = await db.problems.count_documents({"category": "Windows"})
+    printers_problems = await db.problems.count_documents({"category": "Drukarki"})
+    email_problems = await db.problems.count_documents({"category": "Poczta"})
+    onedrive_problems = await db.problems.count_documents({"category": "OneDrive"})
+    other_problems = await db.problems.count_documents({"category": "Inne"})
+    
     return {
         "total": total_problems,
         "new": new_problems,
         "in_progress": in_progress_problems,
-        "resolved": resolved_problems
+        "resolved": resolved_problems,
+        "by_category": {
+            "Windows": windows_problems,
+            "Drukarki": printers_problems,
+            "Poczta": email_problems,
+            "OneDrive": onedrive_problems,
+            "Inne": other_problems
+        }
     }
 
 # Include the router in the main app
