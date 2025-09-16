@@ -33,9 +33,10 @@ Pobierz plik `IT-HelpDesk-Teams.zip` i zapisz na swoim komputerze.
 - 🎯 Automatyczne zamykanie problemów po dodaniu rozwiązania
 
 ## Kategorie problemów:
-- 🖥️ Sprzęt
-- 💻 Oprogramowanie  
-- 🌐 Sieć
+- 🪟 Windows
+- 🖨️ Drukarki  
+- 📧 Poczta
+- ☁️ OneDrive
 - ❓ Inne
 
 ## Statusy problemów:
