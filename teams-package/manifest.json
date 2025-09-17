@@ -28,7 +28,7 @@
   "staticTabs": [
     {
       "entityId": "it-helpdesk",
-      "name": "IT HelpDesk",
+      "name": "HD - Baza Problemów IT",
       "contentUrl": "https://sp-ticketing.preview.emergentagent.com",
       "websiteUrl": "https://sp-ticketing.preview.emergentagent.com",
       "scopes": ["personal"]
