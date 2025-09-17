@@ -108,7 +108,7 @@ const LoadingScreen = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
     <div className="text-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-      <p className="text-gray-600">Ładowanie IT HelpDesk...</p>
+      <p className="text-gray-600">Ładowanie HD - Baza Problemów IT...</p>
     </div>
   </div>
 );
@@ -120,6 +120,7 @@ const Dashboard = () => {
   const [filteredProblems, setFilteredProblems] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentView, setCurrentView] = useState('list');
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -133,11 +134,16 @@ const Dashboard = () => {
 
   useEffect(() => {
     filterProblems();
-  }, [problems, statusFilter, categoryFilter]);
+  }, [problems, statusFilter, categoryFilter, searchQuery]);
 
   const fetchProblems = async () => {
     try {
-      const response = await axios.get(`${API}/problems`);
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+      if (categoryFilter) params.append('category', categoryFilter);
+      if (searchQuery) params.append('search', searchQuery);
+      
+      const response = await axios.get(`${API}/problems?${params}`);
       setProblems(response.data);
       setLoading(false);
     } catch (error) {
@@ -149,20 +155,27 @@ const Dashboard = () => {
   const filterProblems = () => {
     let filtered = problems;
     
-    if (statusFilter) {
-      filtered = filtered.filter(p => p.status === statusFilter);
-    }
-    
-    if (categoryFilter) {
-      filtered = filtered.filter(p => p.category === categoryFilter);
-    }
-    
     // For admin view, show only "Nowy" and "W toku" problems
     if (currentView === 'admin') {
       filtered = filtered.filter(p => p.status === 'Nowy' || p.status === 'W toku');
     }
     
     setFilteredProblems(filtered);
+  };
+
+  const deleteProblem = async (problemId) => {
+    if (window.confirm('Czy na pewno chcesz usunąć ten problem? Tej operacji nie można cofnąć.')) {
+      try {
+        await axios.delete(`${API}/problems/${problemId}`);
+        fetchProblems();
+        if (selectedProblem && selectedProblem.id === problemId) {
+          setCurrentView('list');
+        }
+      } catch (error) {
+        console.error('Error deleting problem:', error);
+        alert('Wystąpił błąd podczas usuwania problemu.');
+      }
+    }
   };
 
   const getStatusColor = (status) => {
@@ -196,7 +209,7 @@ const Dashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">🛠️ IT HelpDesk</h1>
+              <h1 className="text-2xl font-bold text-gray-900">🛠️ HD - Baza Problemów IT</h1>
               <span className="text-sm text-gray-500">
                 Witaj, {user.name} {user.isAdmin && '(Administrator)'}
               </span>
@@ -233,73 +246,36 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {currentView === 'list' && (
           <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <div className="w-6 h-6 text-red-600">🆕</div>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Nowe</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {problems.filter(p => p.status === 'Nowy').length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <div className="w-6 h-6 text-yellow-600">⏳</div>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">W toku</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {problems.filter(p => p.status === 'W toku').length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <div className="w-6 h-6 text-green-600">✅</div>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Rozwiązane</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {problems.filter(p => p.status === 'Rozwiązany').length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <div className="w-6 h-6 text-blue-600">📊</div>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Łącznie</p>
-                    <p className="text-2xl font-semibold text-gray-900">{problems.length}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Filters */}
+            {/* Search and Filters */}
             <div className="bg-white p-4 rounded-lg shadow mb-6">
               <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-72">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    🔍 Wyszukaj w tytułach i opisach
+                  </label>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      // Trigger search after user stops typing
+                      setTimeout(() => fetchProblems(), 500);
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Wpisz słowo kluczowe..."
+                  />
+                </div>
+                
                 <div className="flex-1 min-w-48">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Status
                   </label>
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value);
+                      fetchProblems();
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Wszystkie statusy</option>
@@ -315,7 +291,10 @@ const Dashboard = () => {
                   </label>
                   <select
                     value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    onChange={(e) => {
+                      setCategoryFilter(e.target.value);
+                      fetchProblems();
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Wszystkie kategorie</option>
@@ -332,30 +311,39 @@ const Dashboard = () => {
               {filteredProblems.map(problem => (
                 <div
                   key={problem.id}
-                  className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200 cursor-pointer"
-                  onClick={() => {
-                    setSelectedProblem(problem);
-                    setCurrentView('details');
-                  }}
+                  className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200"
                 >
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-3">
                       <span className="text-2xl">{getCategoryIcon(problem.category)}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(problem.status)}`}>
-                        {problem.status}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(problem.status)}`}>
+                          {problem.status}
+                        </span>
+                        <button
+                          onClick={() => deleteProblem(problem.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                          title="Usuń problem"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                     
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{problem.title}</h3>
+                    <h3 
+                      className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600"
+                      onClick={() => {
+                        setSelectedProblem(problem);
+                        setCurrentView('details');
+                      }}
+                    >
+                      {problem.title}
+                    </h3>
                     <p className="text-gray-600 text-sm mb-3 line-clamp-3">{problem.description}</p>
                     
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>{problem.category}</span>
-                      <span>{new Date(problem.created_at).toLocaleDateString('pl-PL')}</span>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-gray-400">
-                      Zgłoszone przez: {problem.created_by}
+                      <span>📅 {new Date(problem.created_at).toLocaleString('pl-PL')}</span>
                     </div>
 
                     {problem.attachments && problem.attachments.length > 0 && (
@@ -370,9 +358,14 @@ const Dashboard = () => {
 
             {filteredProblems.length === 0 && (
               <div className="text-center py-12">
-                <div className="text-gray-400 text-6xl mb-4">📋</div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Brak problemów</h3>
-                <p className="text-gray-600">Nie znaleziono problemów spełniających kryteria filtrowania.</p>
+                <div className="text-gray-400 text-6xl mb-4">🔍</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Brak wyników</h3>
+                <p className="text-gray-600">
+                  {searchQuery ? 
+                    `Nie znaleziono problemów zawierających "${searchQuery}"` : 
+                    'Nie znaleziono problemów spełniających kryteria filtrowania.'
+                  }
+                </p>
               </div>
             )}
           </>
@@ -395,6 +388,7 @@ const Dashboard = () => {
             user={user}
             onBack={() => setCurrentView('list')}
             onUpdate={fetchProblems}
+            onDelete={deleteProblem}
           />
         )}
 
@@ -450,6 +444,10 @@ const AddProblemForm = ({ user, onBack, onSuccess }) => {
       }
     }
     setAttachments([...attachments, ...uploadedFiles]);
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -538,10 +536,29 @@ const AddProblemForm = ({ user, onBack, onSuccess }) => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             accept="image/*,.pdf,.doc,.docx"
           />
+          
           {attachments.length > 0 && (
-            <p className="text-sm text-gray-600 mt-1">
-              📎 Załączono {attachments.length} plik(ów)
-            </p>
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2">📎 Załączniki ({attachments.length}):</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="relative border rounded overflow-hidden">
+                    <img
+                      src={`data:image/png;base64,${attachment}`}
+                      alt={`Załącznik ${index + 1}`}
+                      className="w-full h-20 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -573,7 +590,7 @@ const AddProblemForm = ({ user, onBack, onSuccess }) => {
 };
 
 // Problem Details Component  
-const ProblemDetails = ({ problem, user, onBack, onUpdate }) => {
+const ProblemDetails = ({ problem, user, onBack, onUpdate, onDelete }) => {
   const [instruction, setInstruction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -636,12 +653,21 @@ const ProblemDetails = ({ problem, user, onBack, onUpdate }) => {
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">🔍 Szczegóły problemu</h2>
-        <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900 transition duration-200"
-        >
-          ← Powrót
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => onDelete(problem.id)}
+            className="text-red-500 hover:text-red-700 px-3 py-1 rounded border border-red-300 hover:border-red-500"
+            title="Usuń problem"
+          >
+            🗑️ Usuń
+          </button>
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition duration-200"
+          >
+            ← Powrót
+          </button>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -663,10 +689,12 @@ const ProblemDetails = ({ problem, user, onBack, onUpdate }) => {
           <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">{problem.description}</p>
         </div>
 
-        {/* User Attachments */}
+        {/* User Attachments - visible to everyone */}
         {problem.attachments && problem.attachments.length > 0 && (
           <div>
-            <h4 className="font-semibold text-gray-900 mb-3">📎 Załączniki od użytkownika</h4>
+            <h4 className="font-semibold text-gray-900 mb-3">
+              📎 Załączniki {user.isAdmin && '(pomogą zrozumieć problem)'}
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {problem.attachments.map((attachment, index) => (
                 <div key={index} className="border rounded-lg overflow-hidden">
@@ -682,9 +710,8 @@ const ProblemDetails = ({ problem, user, onBack, onUpdate }) => {
           </div>
         )}
 
-        <div className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-          <span>👤 Zgłoszone przez: <strong>{problem.created_by}</strong></span>
-          <span>📅 Data: <strong>{new Date(problem.created_at).toLocaleString('pl-PL')}</strong></span>
+        <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+          <span>📅 {new Date(problem.created_at).toLocaleString('pl-PL')}</span>
         </div>
 
         {problem.status === 'Rozwiązany' && instruction && (
@@ -714,7 +741,7 @@ const ProblemDetails = ({ problem, user, onBack, onUpdate }) => {
             )}
 
             <div className="text-sm text-gray-500 mt-4 bg-gray-50 p-3 rounded-lg">
-              ⚙️ Rozwiązanie dodane przez: <strong>{instruction.created_by}</strong> • 📅 {new Date(instruction.created_at).toLocaleString('pl-PL')}
+              📅 {new Date(instruction.created_at).toLocaleString('pl-PL')}
             </div>
           </div>
         )}
@@ -782,15 +809,14 @@ const AdminPanel = ({ problems, onUpdate, onSelectProblem }) => {
                 {problem.attachments && problem.attachments.length > 0 && (
                   <div className="mb-2">
                     <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                      📎 {problem.attachments.length} załącznik(ów) od użytkownika
+                      📎 {problem.attachments.length} załącznik(ów) - podpowiedź do problemu
                     </span>
                   </div>
                 )}
                 
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>📂 Kategoria: {problem.category}</span>
-                  <span>📅 Utworzono: {new Date(problem.created_at).toLocaleDateString('pl-PL')}</span>
-                  <span>👤 Autor: {problem.created_by}</span>
+                  <span>📅 {new Date(problem.created_at).toLocaleDateString('pl-PL')}</span>
                 </div>
               </div>
               <div className="ml-4">
@@ -833,6 +859,10 @@ const AdminSolution = ({ problem, user, onBack, onSuccess }) => {
       }
     }
     setImages([...images, ...uploadedImages]);
+  };
+
+  const removeImage = (index) => {
+    setImages(images.filter((_, i) => i !== index));
   };
 
   const openImageModal = (image, title) => {
@@ -885,7 +915,7 @@ const AdminSolution = ({ problem, user, onBack, onSuccess }) => {
         {/* Show user attachments */}
         {problem.attachments && problem.attachments.length > 0 && (
           <div className="mt-3">
-            <h5 className="text-sm font-medium text-gray-700 mb-2">📎 Załączniki od użytkownika:</h5>
+            <h5 className="text-sm font-medium text-gray-700 mb-2">📎 Załączniki użytkownika (podpowiedź):</h5>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {problem.attachments.map((attachment, index) => (
                 <div key={index} className="border rounded overflow-hidden">
@@ -903,7 +933,7 @@ const AdminSolution = ({ problem, user, onBack, onSuccess }) => {
         
         <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
           <span>📂 Kategoria: {problem.category}</span>
-          <span>👤 Zgłaszający: {problem.created_by}</span>
+          <span>📅 {new Date(problem.created_at).toLocaleString('pl-PL')}</span>
         </div>
       </div>
 
@@ -935,16 +965,23 @@ const AdminSolution = ({ problem, user, onBack, onSuccess }) => {
           />
           {images.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm text-gray-600 mb-2">📸 Dodano {images.length} obraz(ów)</p>
+              <p className="text-sm text-gray-600 mb-2">📸 Instrukcje ({images.length}):</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {images.map((image, index) => (
-                  <div key={index} className="border rounded overflow-hidden">
+                  <div key={index} className="relative border rounded overflow-hidden">
                     <img
                       src={`data:image/png;base64,${image}`}
-                      alt={`Podgląd ${index + 1}`}
+                      alt={`Instrukcja ${index + 1}`}
                       className="w-full h-20 object-cover cursor-pointer hover:opacity-80"
                       onClick={() => openImageModal(image, `Instrukcja krok ${index + 1}`)}
                     />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
