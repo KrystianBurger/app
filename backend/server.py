@@ -26,8 +26,8 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Admin users list
-ADMIN_USERS = ['dawid.boguslaw@emerlog.eu']
+# Default admin users list - will be stored in database
+DEFAULT_ADMIN_USERS = ['dawid.boguslaw@emerlog.eu']
 
 # Define Models
 class Problem(BaseModel):
@@ -49,6 +49,13 @@ class Instruction(BaseModel):
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class Admin(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: str
+    added_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class ProblemCreate(BaseModel):
     title: str
     description: str
@@ -67,6 +74,11 @@ class InstructionCreate(BaseModel):
     instruction_text: str
     images: List[str] = []
     created_by: str
+
+class AdminCreate(BaseModel):
+    email: str
+    name: str
+    added_by: str
 
 # Helper function to prepare data for MongoDB
 def prepare_for_mongo(data):
@@ -102,6 +114,70 @@ def parse_from_mongo(item):
                 parsed[key] = value
         return parsed
     return item
+
+# Helper function to get admin users
+async def get_admin_users():
+    admins = await db.admins.find().to_list(1000)
+    if not admins:
+        # Initialize with default admins
+        for email in DEFAULT_ADMIN_USERS:
+            admin_obj = Admin(email=email, name=email.split('@')[0], added_by="system")
+            mongo_data = prepare_for_mongo(admin_obj.dict())
+            await db.admins.insert_one(mongo_data)
+        admins = await db.admins.find().to_list(1000)
+    
+    parsed_admins = [parse_from_mongo(admin) for admin in admins]
+    return [admin['email'].lower() for admin in parsed_admins]
+
+# Helper function to check if user is admin
+async def is_admin_user(email):
+    admin_emails = await get_admin_users()
+    return email.lower() in admin_emails
+
+# Admin management endpoints
+@api_router.get("/admins", response_model=List[Admin])
+async def get_admins():
+    admins = await db.admins.find().to_list(1000)
+    if not admins:
+        # Initialize with default admins
+        for email in DEFAULT_ADMIN_USERS:
+            admin_obj = Admin(email=email, name=email.split('@')[0], added_by="system")
+            mongo_data = prepare_for_mongo(admin_obj.dict())
+            await db.admins.insert_one(mongo_data)
+        admins = await db.admins.find().to_list(1000)
+    
+    parsed_admins = [parse_from_mongo(admin) for admin in admins]
+    return [Admin(**admin) for admin in parsed_admins]
+
+@api_router.post("/admins", response_model=Admin)
+async def add_admin(admin: AdminCreate):
+    # Check if admin already exists
+    existing_admin = await db.admins.find_one({"email": admin.email.lower()})
+    if existing_admin:
+        raise HTTPException(status_code=400, detail="Admin already exists")
+    
+    admin_obj = Admin(**admin.dict(), email=admin.email.lower())
+    mongo_data = prepare_for_mongo(admin_obj.dict())
+    await db.admins.insert_one(mongo_data)
+    return admin_obj
+
+@api_router.delete("/admins/{admin_email}")
+async def delete_admin(admin_email: str):
+    # Check if this is the last admin
+    admin_count = await db.admins.count_documents({})
+    if admin_count <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the last administrator")
+    
+    result = await db.admins.delete_one({"email": admin_email.lower()})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    return {"message": "Admin deleted successfully"}
+
+@api_router.get("/check-admin/{email}")
+async def check_admin_status(email: str):
+    is_admin = await is_admin_user(email)
+    return {"is_admin": is_admin}
 
 # Problem endpoints
 @api_router.post("/problems", response_model=Problem)

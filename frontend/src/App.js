@@ -5,9 +5,6 @@ import axios from "axios";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Admin users list
-const ADMIN_USERS = ['dawid.boguslaw@emerlog.eu'];
-
 // Teams Context
 const TeamsContext = createContext();
 
@@ -34,7 +31,10 @@ const TeamsProvider = ({ children }) => {
         const userName = context.user?.displayName;
         
         if (userEmail) {
-          const isAdmin = ADMIN_USERS.includes(userEmail.toLowerCase());
+          // Check admin status from backend
+          const adminResponse = await axios.get(`${API}/check-admin/${userEmail}`);
+          const isAdmin = adminResponse.data.is_admin;
+          
           setUser({
             email: userEmail,
             name: userName || userEmail,
@@ -44,10 +44,14 @@ const TeamsProvider = ({ children }) => {
       } else {
         // Fallback for development - simulate Teams user
         console.log('Running outside Teams - using demo user');
+        const demoEmail = 'dawid.boguslaw@emerlog.eu';
+        const adminResponse = await axios.get(`${API}/check-admin/${demoEmail}`);
+        const isAdmin = adminResponse.data.is_admin;
+        
         setUser({
-          email: 'dawid.boguslaw@emerlog.eu',
+          email: demoEmail,
           name: 'Dawid Bogusław',
-          isAdmin: true
+          isAdmin: isAdmin
         });
       }
     } catch (error) {
@@ -112,6 +116,175 @@ const LoadingScreen = () => (
     </div>
   </div>
 );
+
+// Admin Management Component
+const AdminManagement = ({ onBack }) => {
+  const { user } = useTeams();
+  const [admins, setAdmins] = useState([]);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    fetchAdmins();
+  }, []);
+
+  const fetchAdmins = async () => {
+    try {
+      const response = await axios.get(`${API}/admins`);
+      setAdmins(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+      setLoading(false);
+    }
+  };
+
+  const addAdmin = async (e) => {
+    e.preventDefault();
+    if (!newAdminEmail || !newAdminName) return;
+    
+    setAdding(true);
+    try {
+      await axios.post(`${API}/admins`, {
+        email: newAdminEmail,
+        name: newAdminName,
+        added_by: user.email
+      });
+      setNewAdminEmail('');
+      setNewAdminName('');
+      fetchAdmins();
+    } catch (error) {
+      console.error('Error adding admin:', error);
+      if (error.response?.status === 400) {
+        alert('Ten administrator już istnieje w systemie.');
+      } else {
+        alert('Wystąpił błąd podczas dodawania administratora.');
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const deleteAdmin = async (adminEmail) => {
+    if (window.confirm(`Czy na pewno chcesz usunąć administratora ${adminEmail}?`)) {
+      try {
+        await axios.delete(`${API}/admins/${adminEmail}`);
+        fetchAdmins();
+      } catch (error) {
+        console.error('Error deleting admin:', error);
+        if (error.response?.status === 400) {
+          alert('Nie można usunąć ostatniego administratora.');
+        } else {
+          alert('Wystąpił błąd podczas usuwania administratora.');
+        }
+      }
+    }
+  };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">👥 Zarządzanie administratorami</h2>
+        <button
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-900 transition duration-200"
+        >
+          ← Powrót
+        </button>
+      </div>
+
+      {/* Add New Admin Form */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-gray-900 mb-3">➕ Dodaj nowego administratora</h3>
+        <form onSubmit={addAdmin} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email administratora *
+              </label>
+              <input
+                type="email"
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="admin@emerlog.eu"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Imię i nazwisko *
+              </label>
+              <input
+                type="text"
+                value={newAdminName}
+                onChange={(e) => setNewAdminName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Jan Kowalski"
+                required
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={adding}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium disabled:opacity-50"
+          >
+            {adding ? 'Dodawanie...' : '➕ Dodaj administratora'}
+          </button>
+        </form>
+      </div>
+
+      {/* Current Admins List */}
+      <div>
+        <h3 className="font-semibold text-gray-900 mb-3">📋 Obecni administratorzy ({admins.length})</h3>
+        <div className="space-y-3">
+          {admins.map(admin => (
+            <div key={admin.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">👤</span>
+                  <div>
+                    <h4 className="font-medium text-gray-900">{admin.name}</h4>
+                    <p className="text-sm text-gray-600">{admin.email}</p>
+                    <p className="text-xs text-gray-500">
+                      Dodany: {new Date(admin.created_at).toLocaleDateString('pl-PL')}
+                      {admin.added_by !== 'system' && ` przez ${admin.added_by}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {admins.length > 1 && (
+                <button
+                  onClick={() => deleteAdmin(admin.email)}
+                  className="text-red-500 hover:text-red-700 px-3 py-1 rounded border border-red-300 hover:border-red-500 text-sm"
+                  title="Usuń administratora"
+                >
+                  🗑️ Usuń
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {admins.length === 1 && (
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-yellow-800 text-sm">
+            ⚠️ W systemie musi być przynajmniej jeden administrator. Dodaj kolejnego przed usunięciem obecnego.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Main Dashboard Component
 const Dashboard = () => {
@@ -217,16 +390,29 @@ const Dashboard = () => {
             
             <div className="flex items-center space-x-4">
               {user.isAdmin && (
-                <button
-                  onClick={() => setCurrentView(currentView === 'admin' ? 'list' : 'admin')}
-                  className={`px-4 py-2 rounded-lg font-medium transition duration-200 ${
-                    currentView === 'admin'
-                      ? 'bg-purple-600 text-white hover:bg-purple-700'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {currentView === 'admin' ? '👥 Widok użytkownika' : '⚙️ Panel admina'}
-                </button>
+                <>
+                  <button
+                    onClick={() => setCurrentView(currentView === 'admin-management' ? 'list' : 'admin-management')}
+                    className={`px-4 py-2 rounded-lg font-medium transition duration-200 ${
+                      currentView === 'admin-management'
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {currentView === 'admin-management' ? '👥 Widok główny' : '👥 Administratorzy'}
+                  </button>
+                  
+                  <button
+                    onClick={() => setCurrentView(currentView === 'admin' ? 'list' : 'admin')}
+                    className={`px-4 py-2 rounded-lg font-medium transition duration-200 ${
+                      currentView === 'admin'
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {currentView === 'admin' ? '👥 Widok użytkownika' : '⚙️ Panel admina'}
+                  </button>
+                </>
               )}
               
               {currentView === 'list' && (
@@ -251,7 +437,7 @@ const Dashboard = () => {
               <div className="flex flex-wrap gap-4">
                 <div className="flex-1 min-w-72">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    🔍 Wyszukaj w tytułach i opisach
+                    🔍 Wyszukaj
                   </label>
                   <input
                     type="text"
@@ -412,6 +598,12 @@ const Dashboard = () => {
               fetchProblems();
               setCurrentView('admin');
             }}
+          />
+        )}
+
+        {currentView === 'admin-management' && user.isAdmin && (
+          <AdminManagement
+            onBack={() => setCurrentView('list')}
           />
         )}
       </main>
