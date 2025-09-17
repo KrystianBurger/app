@@ -18,8 +18,8 @@
     "full": "HD - Baza Problemów IT - System zarządzania problemami"
   },
   "description": {
-    "short": "System do zgłaszania i rozwiązywania problemów IT",
-    "full": "Kompleksowy system HelpDesk do zarządzania problemami IT w organizacji. Umożliwia zgłaszanie problemów, śledzenie statusu oraz dodawanie rozwiązań przez administratorów."
+    "short": "Baza problemów IT z wyszukiwarką i zarządzaniem",
+    "full": "Kompleksowa baza problemów IT z zaawansowaną wyszukiwarką, systemem załączników i możliwością zarządzania zgłoszeniami przez administratorów."
   },
   "accentColor": "#2563EB",
   "bots": [],
