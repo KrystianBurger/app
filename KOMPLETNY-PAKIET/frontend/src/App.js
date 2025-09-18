@@ -44,13 +44,16 @@ const TeamsProvider = ({ children }) => {
       } else {
         // Fallback for development - simulate Teams user
         console.log('Running outside Teams - using demo user');
-        const demoEmail = 'dawid.boguslaw@emerlog.eu';
+        
+        // TODO: ZASTĄP SWOIM EMAILEM ADMINISTRATORA
+        // Ten email powinien być taki sam jak ADMIN_EMAIL w backend .env
+        const demoEmail = process.env.REACT_APP_DEMO_ADMIN_EMAIL || 'admin@twoja-domena.pl';
         const adminResponse = await axios.get(`${API}/check-admin/${demoEmail}`);
         const isAdmin = adminResponse.data.is_admin;
         
         setUser({
           email: demoEmail,
-          name: 'Dawid Bogusław',
+          name: demoEmail.split('@')[0],
           isAdmin: isAdmin
         });
       }
