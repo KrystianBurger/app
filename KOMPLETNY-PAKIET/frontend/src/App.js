@@ -1,9 +1,8 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
-import "./index.css";
+import "./App.css";
 import axios from "axios";
 
-// Get backend URL from environment or use default
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 // Teams Context
@@ -46,23 +45,14 @@ const TeamsProvider = ({ children }) => {
         // Fallback for development - simulate Teams user
         console.log('Running outside Teams - using demo user');
         const demoEmail = 'dawid.boguslaw@emerlog.eu';
-        try {
-          const adminResponse = await axios.get(`${API}/check-admin/${demoEmail}`);
-          const isAdmin = adminResponse.data.is_admin;
-          
-          setUser({
-            email: demoEmail,
-            name: 'Dawid Bogusław',
-            isAdmin: isAdmin
-          });
-        } catch (error) {
-          console.error('Backend connection failed:', error);
-          setUser({
-            email: demoEmail,
-            name: 'Dawid Bogusław',
-            isAdmin: true
-          });
-        }
+        const adminResponse = await axios.get(`${API}/check-admin/${demoEmail}`);
+        const isAdmin = adminResponse.data.is_admin;
+        
+        setUser({
+          email: demoEmail,
+          name: 'Dawid Bogusław',
+          isAdmin: isAdmin
+        });
       }
     } catch (error) {
       console.error('Teams initialization failed:', error);
@@ -621,16 +611,610 @@ const Dashboard = () => {
   );
 };
 
-// Add Problem Form Component (skrócona wersja - pełna w następnej części)
+// Add Problem Form Component
 const AddProblemForm = ({ user, onBack, onSuccess }) => {
-  // ... (kod identyczny jak wcześniej)
-  return <div>Add Problem Form - pełny kod w pliku</div>;
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'Windows'
+  });
+  const [attachments, setAttachments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const categoryOptions = ['Windows', 'Drukarki', 'Poczta', 'OneDrive', 'Inne'];
+
+  const handleFileUpload = async (files) => {
+    const uploadedFiles = [];
+    for (let file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await axios.post(`${API}/upload`, formData);
+        uploadedFiles.push(response.data.base64_data);
+      } catch (error) {
+        console.error('File upload failed:', error);
+      }
+    }
+    setAttachments([...attachments, ...uploadedFiles]);
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      await axios.post(`${API}/problems`, {
+        ...formData,
+        attachments,
+        created_by: user.name || user.email
+      });
+      onSuccess();
+    } catch (error) {
+      console.error('Problem creation failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">➕ Dodaj nowy problem</h2>
+        <button
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-900 transition duration-200"
+        >
+          ← Powrót
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tytuł problemu *
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData({...formData, title: e.target.value})}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Krótko opisz problem..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Kategoria *
+          </label>
+          <select
+            value={formData.category}
+            onChange={(e) => setFormData({...formData, category: e.target.value})}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          >
+            {categoryOptions.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Opis problemu *
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            rows={6}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Opisz szczegółowo problem, który wystąpił..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Załączniki (zdjęcia, dokumenty)
+          </label>
+          <input
+            type="file"
+            multiple
+            onChange={(e) => handleFileUpload(Array.from(e.target.files))}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            accept="image/*,.pdf,.doc,.docx"
+          />
+          
+          {attachments.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2">📎 Załączniki ({attachments.length}):</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="relative border rounded overflow-hidden">
+                    <img
+                      src={`data:image/png;base64,${attachment}`}
+                      alt={`Załącznik ${index + 1}`}
+                      className="w-full h-20 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <p className="text-sm text-gray-600">
+            <strong>Zgłaszane przez:</strong> {user.name} ({user.email})
+          </p>
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition duration-200 font-medium"
+          >
+            Anuluj
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium disabled:opacity-50"
+          >
+            {loading ? 'Zapisywanie...' : '💾 Zapisz problem'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 };
 
-// Pozostałe komponenty będą w kolejnych plikach...
-const ProblemDetails = () => <div>Problem Details - pełny kod w pliku</div>;
-const AdminPanel = () => <div>Admin Panel - pełny kod w pliku</div>;
-const AdminSolution = () => <div>Admin Solution - pełny kod w pliku</div>;
+// Problem Details Component  
+const ProblemDetails = ({ problem, user, onBack, onUpdate, onDelete }) => {
+  const [instruction, setInstruction] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (problem.status === 'Rozwiązany') {
+      fetchInstruction();
+    } else {
+      setLoading(false);
+    }
+  }, [problem]);
+
+  const fetchInstruction = async () => {
+    try {
+      const response = await axios.get(`${API}/instructions/${problem.id}`);
+      setInstruction(response.data);
+    } catch (error) {
+      console.error('Error fetching instruction:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openImageModal = (image, title) => {
+    setSelectedImage(image);
+    setImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setImageModalOpen(false);
+    setSelectedImage(null);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Nowy': return 'bg-red-100 text-red-800';
+      case 'W toku': return 'bg-yellow-100 text-yellow-800';
+      case 'Rozwiązany': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case 'Windows': return '🪟';
+      case 'Drukarki': return '🖨️';
+      case 'Poczta': return '📧';
+      case 'OneDrive': return '☁️';
+      case 'Inne': return '❓';
+      default: return '📝';
+    }
+  };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">🔍 Szczegóły problemu</h2>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => onDelete(problem.id)}
+            className="text-red-500 hover:text-red-700 px-3 py-1 rounded border border-red-300 hover:border-red-500"
+            title="Usuń problem"
+          >
+            🗑️ Usuń
+          </button>
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition duration-200"
+          >
+            ← Powrót
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center space-x-3">
+            <span className="text-3xl">{getCategoryIcon(problem.category)}</span>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900">{problem.title}</h3>
+              <p className="text-gray-600">{problem.category}</p>
+            </div>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(problem.status)}`}>
+            {problem.status}
+          </span>
+        </div>
+
+        <div>
+          <h4 className="font-semibold text-gray-900 mb-2">📝 Opis problemu</h4>
+          <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">{problem.description}</p>
+        </div>
+
+        {/* User Attachments - visible to everyone */}
+        {problem.attachments && problem.attachments.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">
+              📎 Załączniki {user.isAdmin && '(pomogą zrozumieć problem)'}
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {problem.attachments.map((attachment, index) => (
+                <div key={index} className="border rounded-lg overflow-hidden">
+                  <img
+                    src={`data:image/png;base64,${attachment}`}
+                    alt={`Załącznik ${index + 1}`}
+                    className="w-full h-48 object-cover hover:scale-105 transition-transform duration-200 cursor-pointer"
+                    onClick={() => openImageModal(attachment, `Załącznik ${index + 1}`)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+          <span>📅 {new Date(problem.created_at).toLocaleString('pl-PL')}</span>
+        </div>
+
+        {problem.status === 'Rozwiązany' && instruction && (
+          <div className="border-t pt-6">
+            <h4 className="font-semibold text-gray-900 mb-4 text-lg">✅ Rozwiązanie</h4>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-gray-700 whitespace-pre-wrap">{instruction.instruction_text}</p>
+            </div>
+
+            {instruction.images && instruction.images.length > 0 && (
+              <div>
+                <h5 className="font-medium text-gray-900 mb-3">📸 Instrukcje krok po kroku</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {instruction.images.map((image, index) => (
+                    <div key={index} className="border rounded-lg overflow-hidden">
+                      <img
+                        src={`data:image/png;base64,${image}`}
+                        alt={`Instrukcja ${index + 1}`}
+                        className="w-full h-48 object-cover hover:scale-105 transition-transform duration-200 cursor-pointer"
+                        onClick={() => openImageModal(image, `Instrukcja krok ${index + 1}`)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="text-sm text-gray-500 mt-4 bg-gray-50 p-3 rounded-lg">
+              📅 {new Date(instruction.created_at).toLocaleString('pl-PL')}
+            </div>
+          </div>
+        )}
+
+        {problem.status !== 'Rozwiązany' && user.isAdmin && (
+          <div className="border-t pt-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-yellow-800">
+                ⏳ Ten problem jeszcze nie został rozwiązany. Jako administrator możesz dodać rozwiązanie w panelu admina.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Image Modal */}
+      <ImageModal
+        image={selectedImage}
+        isOpen={imageModalOpen}
+        onClose={closeImageModal}
+        title="Powiększony obraz"
+      />
+    </div>
+  );
+};
+
+// Admin Panel Component
+const AdminPanel = ({ problems, onUpdate, onSelectProblem }) => {
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">⚙️ Panel administratora</h2>
+      
+      <div className="mb-4">
+        <p className="text-gray-600">
+          Problemy oczekujące na rozwiązanie: <span className="font-semibold text-blue-600">{problems.length}</span>
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {problems.map(problem => (
+          <div
+            key={problem.id}
+            className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition duration-200"
+            onClick={() => onSelectProblem(problem)}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">
+                    {problem.category === 'Windows' ? '🪟' : 
+                     problem.category === 'Drukarki' ? '🖨️' : 
+                     problem.category === 'Poczta' ? '📧' : 
+                     problem.category === 'OneDrive' ? '☁️' : '❓'}
+                  </span>
+                  <h3 className="font-semibold text-gray-900">{problem.title}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    problem.status === 'Nowy' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {problem.status}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-sm mb-2 line-clamp-2">{problem.description}</p>
+                
+                {/* Show user attachments preview for admin */}
+                {problem.attachments && problem.attachments.length > 0 && (
+                  <div className="mb-2">
+                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      📎 {problem.attachments.length} załącznik(ów) - podpowiedź do problemu
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>📂 Kategoria: {problem.category}</span>
+                  <span>📅 {new Date(problem.created_at).toLocaleDateString('pl-PL')}</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <span className="text-blue-600 text-sm font-medium">✏️ Dodaj rozwiązanie →</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {problems.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-6xl mb-4">🎉</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Świetna robota!</h3>
+          <p className="text-gray-600">Wszystkie problemy zostały rozwiązane.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Admin Solution Component
+const AdminSolution = ({ problem, user, onBack, onSuccess }) => {
+  const [instructionText, setInstructionText] = useState('');
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  const handleImageUpload = async (files) => {
+    const uploadedImages = [];
+    for (let file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await axios.post(`${API}/upload`, formData);
+        uploadedImages.push(response.data.base64_data);
+      } catch (error) {
+        console.error('Image upload failed:', error);
+      }
+    }
+    setImages([...images, ...uploadedImages]);
+  };
+
+  const removeImage = (index) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
+
+  const openImageModal = (image, title) => {
+    setSelectedImage(image);
+    setImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setImageModalOpen(false);
+    setSelectedImage(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      await axios.post(`${API}/instructions`, {
+        problem_id: problem.id,
+        instruction_text: instructionText,
+        images,
+        created_by: user.name || user.email
+      });
+      onSuccess();
+    } catch (error) {
+      console.error('Instruction creation failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">✏️ Dodaj rozwiązanie</h2>
+        <button
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-900 transition duration-200"
+        >
+          ← Powrót
+        </button>
+      </div>
+
+      {/* Problem Summary */}
+      <div className="bg-gray-50 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-gray-900 mb-2">📋 Problem do rozwiązania:</h3>
+        <h4 className="font-medium text-gray-800 mb-1">{problem.title}</h4>
+        <p className="text-gray-700 text-sm mb-2">{problem.description}</p>
+        
+        {/* Show user attachments */}
+        {problem.attachments && problem.attachments.length > 0 && (
+          <div className="mt-3">
+            <h5 className="text-sm font-medium text-gray-700 mb-2">📎 Załączniki użytkownika (podpowiedź):</h5>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {problem.attachments.map((attachment, index) => (
+                <div key={index} className="border rounded overflow-hidden">
+                  <img
+                    src={`data:image/png;base64,${attachment}`}
+                    alt={`Załącznik ${index + 1}`}
+                    className="w-full h-20 object-cover cursor-pointer hover:opacity-80"
+                    onClick={() => openImageModal(attachment, `Załącznik użytkownika ${index + 1}`)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+          <span>📂 Kategoria: {problem.category}</span>
+          <span>📅 {new Date(problem.created_at).toLocaleString('pl-PL')}</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Instrukcja rozwiązania *
+          </label>
+          <textarea
+            value={instructionText}
+            onChange={(e) => setInstructionText(e.target.value)}
+            rows={8}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Opisz krok po kroku jak rozwiązać ten problem..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Zrzuty ekranu rozwiązania
+          </label>
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => handleImageUpload(Array.from(e.target.files))}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {images.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2">📸 Instrukcje ({images.length}):</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {images.map((image, index) => (
+                  <div key={index} className="relative border rounded overflow-hidden">
+                    <img
+                      src={`data:image/png;base64,${image}`}
+                      alt={`Instrukcja ${index + 1}`}
+                      className="w-full h-20 object-cover cursor-pointer hover:opacity-80"
+                      onClick={() => openImageModal(image, `Instrukcja krok ${index + 1}`)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>👨‍💼 Rozwiązanie dodawane przez:</strong> {user.name} ({user.email})
+          </p>
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition duration-200 font-medium"
+          >
+            Anuluj
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition duration-200 font-medium disabled:opacity-50"
+          >
+            {loading ? 'Zapisywanie...' : '✅ Zapisz rozwiązanie'}
+          </button>
+        </div>
+      </form>
+
+      {/* Image Modal */}
+      <ImageModal
+        image={selectedImage}
+        isOpen={imageModalOpen}
+        onClose={closeImageModal}
+        title="Powiększony obraz"
+      />
+    </div>
+  );
+};
 
 // Main App Component
 function App() {
