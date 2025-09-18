@@ -1,0 +1,44 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.2",
+  "id": "f7a8c5e4-1b2d-4e3f-9a8b-7c6d5e4f3a2b",
+  "packageName": "com.emerlog.hd.problems",
+  "developer": {
+    "name": "Emerlog IT Team",
+    "websiteUrl": "https://emerlog.eu",
+    "privacyUrl": "https://emerlog.eu",
+    "termsOfUseUrl": "https://emerlog.eu"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "HD Problemy IT",
+    "full": "HD - Baza Problemów IT"
+  },
+  "description": {
+    "short": "System zarządzania problemami IT",
+    "full": "Kompleksowy system do zgłaszania i rozwiązywania problemów IT z wyszukiwarką i panelem administratora"
+  },
+  "accentColor": "#2563EB",
+  "configurableTabs": [],
+  "staticTabs": [
+    {
+      "entityId": "hd-problems-tab",
+      "name": "HD Problemy IT",
+      "contentUrl": "https://TWOJA-DOMENA.onrender.com",
+      "websiteUrl": "https://TWOJA-DOMENA.onrender.com",
+      "scopes": ["personal"]
+    }
+  ],
+  "bots": [],
+  "composeExtensions": [],
+  "permissions": [
+    "identity"
+  ],
+  "validDomains": [
+    "TWOJA-DOMENA.onrender.com"
+  ]
+}
