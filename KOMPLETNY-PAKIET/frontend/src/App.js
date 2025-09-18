@@ -217,7 +217,7 @@ const AdminManagement = ({ onBack }) => {
                 value={newAdminEmail}
                 onChange={(e) => setNewAdminEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="admin@emerlog.eu"
+                placeholder="admin@twoja-firma.pl"
                 required
               />
             </div>
