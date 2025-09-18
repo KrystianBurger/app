@@ -60,9 +60,10 @@ const TeamsProvider = ({ children }) => {
     } catch (error) {
       console.error('Teams initialization failed:', error);
       // Fallback user for demo
+      const demoEmail = process.env.REACT_APP_DEMO_ADMIN_EMAIL || 'demo.user@twoja-domena.pl';
       setUser({
-        email: 'demo.user@emerlog.eu',
-        name: 'Demo User',
+        email: demoEmail,
+        name: demoEmail.split('@')[0],
         isAdmin: false
       });
     } finally {
