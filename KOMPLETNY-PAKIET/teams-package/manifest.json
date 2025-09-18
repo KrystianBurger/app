@@ -3,12 +3,12 @@
   "manifestVersion": "1.16",
   "version": "1.0.1",
   "id": "f7a8c5e4-1b2d-4e3f-9a8b-7c6d5e4f3a2b",
-  "packageName": "com.emerlog.hd.problems",
+  "packageName": "com.twoja-firma.hd.problems",
   "developer": {
-    "name": "Emerlog IT Team",
-    "websiteUrl": "https://emerlog.eu",
-    "privacyUrl": "https://emerlog.eu",
-    "termsOfUseUrl": "https://emerlog.eu"
+    "name": "Twoja Firma IT Team",
+    "websiteUrl": "https://twoja-domena.pl",
+    "privacyUrl": "https://twoja-domena.pl",
+    "termsOfUseUrl": "https://twoja-domena.pl"
   },
   "icons": {
     "color": "color.png",
@@ -28,8 +28,8 @@
     {
       "entityId": "hd-problems-tab",
       "name": "HD Problemy IT",
-      "contentUrl": "https://tech-assist-20.preview.emergentagent.com",
-      "websiteUrl": "https://tech-assist-20.preview.emergentagent.com",
+      "contentUrl": "https://TWOJA-DOMENA-APLIKACJI.onrender.com",
+      "websiteUrl": "https://TWOJA-DOMENA-APLIKACJI.onrender.com",
       "scopes": ["personal"]
     }
   ],
@@ -39,6 +39,6 @@
     "identity"
   ],
   "validDomains": [
-    "sp-ticketing.preview.emergentagent.com"
+    "TWOJA-DOMENA-APLIKACJI.onrender.com"
   ]
 }
