@@ -14,7 +14,7 @@ Twoja aplikacja **działa obecnie na stabilnej infrastrukturze** i **nie wymaga*
 
 ### 📱 **URL aplikacji:**
 ```
-https://sp-ticketing.preview.emergentagent.com
+https://tech-assist-20.preview.emergentagent.com
 ```
 
 ### 🔐 **Nie musisz się logować nigdzie:**

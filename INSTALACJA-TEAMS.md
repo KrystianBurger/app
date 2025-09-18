@@ -104,7 +104,7 @@ Pobierz plik: /app/teams-package/IT-HelpDesk-Teams.zip
 **Rozwiązanie:** Musisz mieć uprawnienia administratora w organizacji lub ta funkcja musi być włączona przez IT.
 
 ### **Problem: "Aplikacja się nie ładuje"**
-**Rozwiązanie:** Sprawdź czy masz dostęp do internetu i czy URL https://sp-ticketing.preview.emergentagent.com jest dostępny.
+**Rozwiązanie:** Sprawdź czy masz dostęp do internetu i czy URL https://tech-assist-20.preview.emergentagent.com jest dostępny.
 
 ### **Problem: "Nie widzę panelu admina"**
 **Rozwiązanie:** Panel admina jest dostępny tylko dla dawid.boguslaw@emerlog.eu. Inne osoby widzą tylko funkcje użytkownika.

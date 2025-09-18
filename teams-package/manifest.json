@@ -28,8 +28,8 @@
     {
       "entityId": "hd-problems-tab",
       "name": "HD Problemy IT",
-      "contentUrl": "https://sp-ticketing.preview.emergentagent.com",
-      "websiteUrl": "https://sp-ticketing.preview.emergentagent.com",
+      "contentUrl": "https://tech-assist-20.preview.emergentagent.com",
+      "websiteUrl": "https://tech-assist-20.preview.emergentagent.com",
       "scopes": ["personal"]
     }
   ],
